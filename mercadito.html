@@ -571,38 +571,53 @@ async function registrarVenta() {
   const precio   = parseFloat(document.getElementById('vcPrecio').value) || 0;
   if (cant <= 0 || precio <= 0) { _toast('Completa cantidad y precio'); return; }
 
-  document.getElementById('btnVender').disabled = true;
-  document.getElementById('btnVender').textContent = 'Registrando…';
+  const btn = document.getElementById('btnVender');
+  btn.disabled = true;
+  btn.textContent = 'Registrando…';
 
-  // Envía al formulario de venta (simulado como POST al Apps Script)
-  // En producción esto llama al doGet con accion=venta o usa el Google Form
+  // Llama al endpoint venta_directa — registra en Sheets y descuenta stock
   try {
     const params = new URLSearchParams({
-      accion: 'venta_directa',
-      sku: _sel.sku,
+      accion:   'venta_directa',
+      sku:      _sel.sku,
       cantidad: cant,
-      precio: precio,
-      usuario: vendedor,
+      precio:   precio,
+      usuario:  vendedor,
     });
-    // Intenta llamar al script directo (requiere endpoint habilitado en doGet)
-    await fetch(_cfg.url + '?' + params.toString(), { method: 'GET', mode: 'no-cors' });
-  } catch(e) { /* no-cors silencia el error */ }
+    const res  = await fetch(_cfg.url + '?' + params.toString());
+    const data = await res.json();
 
-  // Registra el ticket localmente independiente de la respuesta
-  _registrarTicketLocal(_sel, cant, precio, vendedor);
-  _toast(`✓ ${cant} × ${_sel.nombre.split(' ')[0]}`);
+    if (data.ok) {
+      _registrarTicketLocal(_sel, cant, precio, vendedor);
+      _toast('✓ ' + cant + ' × ' + _sel.nombre.split(' ')[0] + ' registrado');
 
-  // Reset
+      // Actualiza stock local restando lo vendido
+      const idx = _prods.findIndex(p => p.sku === _sel.sku);
+      if (idx >= 0) {
+        _prods[idx].mercadito = Math.max(0, (Number(_prods[idx].mercadito) || 0) - cant);
+        _prods[idx].total     = Math.max(0, (Number(_prods[idx].total)     || 0) - cant);
+      }
+    } else {
+      _toast('⚠ Error: ' + (data.error || 'intenta de nuevo'));
+      btn.disabled = false;
+      btn.textContent = '✓ Registrar venta';
+      return;
+    }
+  } catch(e) {
+    _toast('⚠ Sin conexión — venta no registrada');
+    btn.disabled = false;
+    btn.textContent = '✓ Registrar venta';
+    return;
+  }
+
+  // Reset formulario
   document.getElementById('ventaCard').classList.remove('visible');
   document.getElementById('buscarProd').value = '';
   _sel = null;
   filtrarProductos();
 
-  document.getElementById('btnVender').disabled = false;
-  document.getElementById('btnVender').textContent = '✓ Registrar venta';
-
-  // Recarga stock después de 2s
-  setTimeout(cargarProductos, 2000);
+  btn.disabled = false;
+  btn.textContent = '✓ Registrar venta';
 }
 
 function _registrarTicketLocal(prod, cant, precio, vendedor) {
