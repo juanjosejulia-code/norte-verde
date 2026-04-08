@@ -541,9 +541,15 @@ function seleccionar(sku) {
   document.getElementById('vcProducto').innerHTML =
     `<strong>${_sel.nombre}</strong>${_sel.productor ? ' · ' + _sel.productor : ''}`;
   document.getElementById('vcCantidad').value = 1;
-  document.getElementById('vcPrecio').value   = _sel.precioVenta || '';
+
+  // Precio desde MAESTRO_SKU — siempre actualizado
+  const precioVenta = Number(_sel.precioVenta) || 0;
+  document.getElementById('vcPrecio').value = precioVenta > 0 ? precioVenta : '';
   document.getElementById('precioSugerido').innerHTML =
-    _sel.precioVenta ? `sugerido: <span>$${_fmt(_sel.precioVenta)}</span>` : '';
+    precioVenta > 0
+      ? `precio lista: <span>$${_fmt(precioVenta)}</span>`
+      : '<span style="color:#ff9070">sin precio en maestro</span>';
+
   actualizarTotal();
 
   // Scroll al card
