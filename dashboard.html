@@ -103,6 +103,13 @@ body {
   overflow: hidden;
   transition: border-color .2s;
 }
+.stat-card.clickable {
+  cursor: pointer;
+  transition: border-color .2s, transform .1s;
+}
+.stat-card.clickable:hover { border-color: rgba(255,255,255,0.15); }
+.stat-card.clickable:active { transform: scale(0.98); }
+.stat-card.clickable.activo { border-color: var(--oro) !important; }
 .stat-card::before {
   content: '';
   position: absolute;
@@ -469,30 +476,30 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
 
   <!-- RESUMEN -->
   <div class="resumen-grid">
-    <div class="stat-card bod">
+    <div class="stat-card bod clickable" onclick="filtrarPorNodo('bodega')" title="Ver stock de Bodega">
       <div class="stat-label">Bodega</div>
       <div class="stat-num" id="numBodega">—</div>
-      <div class="stat-unit">botellas</div>
+      <div class="stat-unit">botellas · toca para ver</div>
     </div>
-    <div class="stat-card barra">
+    <div class="stat-card barra clickable" onclick="filtrarPorNodo('barra')" title="Ver stock de Barra">
       <div class="stat-label">Barra</div>
       <div class="stat-num" id="numBarra">—</div>
-      <div class="stat-unit">botellas</div>
+      <div class="stat-unit">botellas · toca para ver</div>
     </div>
-    <div class="stat-card merc">
+    <div class="stat-card merc clickable" onclick="filtrarPorNodo('mercadito')" title="Ver stock de Mercadito">
       <div class="stat-label">Mercadito</div>
       <div class="stat-num" id="numMercadito">—</div>
-      <div class="stat-unit">botellas</div>
+      <div class="stat-unit">botellas · toca para ver</div>
     </div>
-    <div class="stat-card trans">
+    <div class="stat-card trans clickable" onclick="filtrarPorNodo('transito')" title="Ver productos en tránsito">
       <div class="stat-label">En tránsito</div>
       <div class="stat-num" id="numTransito">—</div>
-      <div class="stat-unit">botellas</div>
+      <div class="stat-unit">botellas · toca para ver</div>
     </div>
-    <div class="stat-card total">
+    <div class="stat-card total clickable" onclick="filtrarPorNodo('')" title="Ver todo el stock">
       <div class="stat-label">Total sistema</div>
       <div class="stat-num" id="numTotal">—</div>
-      <div class="stat-unit">botellas</div>
+      <div class="stat-unit">botellas · toca para ver todo</div>
     </div>
   </div>
 
@@ -506,6 +513,10 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
 
   <!-- PANEL STOCK -->
   <div id="panel-stock">
+    <div id="filtroNodoActivo" style="display:none;margin-bottom:12px;display:none;align-items:center;gap:10px;">
+      <span id="filtroNodoLabel" style="font-size:13px;font-weight:500;color:var(--crema)"></span>
+      <button onclick="filtrarPorNodo('')" style="background:none;border:1px solid rgba(255,255,255,0.15);color:var(--gris);font-size:11px;padding:3px 10px;border-radius:4px;cursor:pointer;">× Ver todo</button>
+    </div>
     <div class="controles">
       <input class="buscar" id="buscarInput" placeholder="Buscar por nombre o SKU…" oninput="filtrarTabla()">
       <select class="filtro-select" id="filtroCat" onchange="filtrarTabla()">
@@ -735,6 +746,42 @@ function _renderTablaStock(items) {
       <td class="r"><span class="${cls(nTot)}" style="font-weight:500">${nTot}</span></td>
     </tr>`;
   }).join('');
+}
+
+function filtrarPorNodo(nodo) {
+  // Activa la tab de stock si no está activa
+  const tabStock = document.querySelector('.tab');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  tabStock.classList.add('active');
+  ['stock','movimientos','ventas','config'].forEach(p => {
+    document.getElementById('panel-'+p).style.display = 'none';
+  });
+  document.getElementById('panel-stock').style.display = 'block';
+
+  // Actualiza el select de nodo
+  document.getElementById('filtroNodo').value = nodo;
+
+  // Resalta la tarjeta activa
+  document.querySelectorAll('.stat-card.clickable').forEach(c => c.classList.remove('activo'));
+  const mapa = { bodega:'bod', barra:'barra', mercadito:'merc', transito:'trans', '':'total' };
+  const cls  = mapa[nodo];
+  if (cls) {
+    const card = document.querySelector('.stat-card.' + cls);
+    if (card) card.classList.add('activo');
+  }
+
+  // Muestra / oculta el indicador de filtro activo
+  const ind   = document.getElementById('filtroNodoActivo');
+  const label = document.getElementById('filtroNodoLabel');
+  const nombres = { bodega:'Bodega', barra:'Barra', mercadito:'Mercadito', transito:'En tránsito' };
+  if (nodo && nombres[nodo]) {
+    label.textContent = 'Mostrando: ' + nombres[nodo];
+    ind.style.display = 'flex';
+  } else {
+    ind.style.display = 'none';
+  }
+
+  filtrarTabla();
 }
 
 function filtrarTabla() {
