@@ -507,7 +507,8 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
   <div class="tabs">
     <button class="tab active" onclick="setTab('stock',this)">Stock por SKU</button>
     <button class="tab" onclick="setTab('movimientos',this)">Movimientos</button>
-    <button class="tab" onclick="setTab('ventas',this)">Ventas</button>
+    <button class="tab" onclick="setTab('ventas',this)">Ventas Mercadito</button>
+    <button class="tab" onclick="setTab('barra',this)">Consumo Barra</button>
     <button class="tab" onclick="setTab('config',this)">Configuración</button>
   </div>
 
@@ -589,6 +590,29 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
     </div>
   </div>
 
+  <!-- PANEL CONSUMO BARRA -->
+  <div id="panel-barra" style="display:none">
+    <div class="ventas-resumen" id="barraResumen"></div>
+    <div class="tabla-wrap">
+      <div class="tabla-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Vino</th>
+              <th>Momento</th>
+              <th class="r">Botellas</th>
+              <th>Barman</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyBarra">
+            <tr><td colspan="5"><div class="empty"><div class="empty-icon">🍷</div>Sin consumos registrados</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- PANEL CONFIG -->
   <div id="panel-config" style="display:none">
     <div class="config-section">
@@ -647,7 +671,7 @@ _actualizarLinksQR();
 
 // ── TABS ──────────────────────────────────────────────────────
 function setTab(nombre, btn) {
-  ['stock','movimientos','ventas','config'].forEach(p => {
+  ['stock','movimientos','ventas','barra','config'].forEach(p => {
     document.getElementById('panel-'+p).style.display = 'none';
   });
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -655,6 +679,7 @@ function setTab(nombre, btn) {
   btn.classList.add('active');
   if (nombre === 'movimientos') cargarMovimientos();
   if (nombre === 'ventas')      cargarVentas();
+  if (nombre === 'barra')       cargarConsumoBarra();
 }
 
 // ── CARGA DE DATOS ────────────────────────────────────────────
@@ -700,6 +725,64 @@ async function cargarVentas() {
     _renderVentas(data.ventas || [], data.totalVentas || 0);
   } catch(e) { console.error(e); }
   _setLoading(false);
+}
+
+async function cargarConsumoBarra() {
+  const url = _config.scriptUrl;
+  if (!url) return;
+  _setLoading(true);
+  try {
+    const res  = await fetch(url + '?accion=movimientos');
+    const data = await res.json();
+    // Filtra solo VENTA desde BARRA
+    const consumos = (data.movimientos || []).filter(m => m.tipo === 'VENTA' && m.origen === 'BARRA');
+    _renderConsumoBarra(consumos);
+  } catch(e) { console.error(e); }
+  _setLoading(false);
+}
+
+function _renderConsumoBarra(consumos) {
+  // Resumen total
+  const totalBots = consumos.reduce((s, m) => s + (Number(m.cantidad)||0), 0);
+  const resEl = document.getElementById('barraResumen');
+  resEl.innerHTML = `
+    <div class="stat-card barra" style="padding:14px 16px">
+      <div class="stat-label">Total consumido barra</div>
+      <div class="stat-num">${totalBots}</div>
+      <div class="stat-unit">botellas</div>
+    </div>
+    <div class="stat-card bod" style="padding:14px 16px">
+      <div class="stat-label">Registros de consumo</div>
+      <div class="stat-num">${consumos.length}</div>
+      <div class="stat-unit">entradas</div>
+    </div>`;
+
+  const tbody = document.getElementById('tbodyBarra');
+  if (!consumos.length) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="empty-icon">🍷</div>Sin consumos registrados</div></td></tr>';
+    return;
+  }
+
+  // Agrupa por SKU para ver totales
+  const porSku = {};
+  consumos.forEach(m => {
+    if (!porSku[m.sku]) porSku[m.sku] = { nombre: _nombreSKU(m.sku), total: 0 };
+    porSku[m.sku].total += Number(m.cantidad)||0;
+  });
+
+  // Tabla detalle
+  tbody.innerHTML = consumos.map(m => {
+    const ts = m.timestamp ? new Date(m.timestamp).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+    // Momento viene en notas
+    const momento = m.notas ? m.notas.split(' - ')[0] : '—';
+    return `<tr>
+      <td style="font-family:var(--ff-mono);font-size:11px;color:var(--gris)">${ts}</td>
+      <td><span class="sku-badge">${m.sku||''}</span>${_nombreSKU(m.sku)}</td>
+      <td><span style="font-size:11px;background:rgba(74,45,107,.3);color:#c4a8f0;padding:2px 7px;border-radius:3px">${momento}</span></td>
+      <td class="r" style="font-weight:500">${m.cantidad||'—'}</td>
+      <td style="font-size:12px;color:var(--gris)">${m.usuario||'—'}</td>
+    </tr>`;
+  }).join('');
 }
 
 // ── RESUMEN ───────────────────────────────────────────────────
